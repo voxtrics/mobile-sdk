@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="title">Voxtrics SDK demo</string>
+    <string name="base_url">Base URL</string>
+    <string name="base_url_hint">With adb reverse tcp:3000 and tcp:4000, the local stack is http://localhost:3000</string>
+    <string name="survey_id">Survey ID</string>
+    <string name="screen">Screen</string>
+    <string name="theme">Theme</string>
+    <string name="theme_system">System</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="show_survey">Show survey</string>
+    <string name="clear_log">Clear log</string>
+</resources>

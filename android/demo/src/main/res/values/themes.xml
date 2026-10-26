@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- AppCompat, not Material, on purpose: the SDK's sheet must bring its own Material theme. -->
+    <style name="Theme.VoxtricsDemo" parent="Theme.AppCompat.DayNight.NoActionBar" />
+</resources>

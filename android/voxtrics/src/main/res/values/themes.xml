@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- The sheet's own theme, whatever the host app's is: a Material bottom sheet crashes under a theme that is not
+         MaterialComponents/Material3, and an app using the SDK owes it no particular theme. DayNight follows the
+         app's night mode, so the dim and the window chrome match the screen the sheet opens over. -->
+    <style name="Voxtrics.BottomSheetDialog" parent="Theme.Material3.DayNight.BottomSheetDialog">
+        <item name="bottomSheetStyle">@style/Voxtrics.BottomSheet</item>
+        <!-- Down to the screen's bottom edge, under the navigation bar - Android 15 and later draw every window so,
+             and without this the dim shows in a strip below the sheet. -->
+        <item name="enableEdgeToEdge">true</item>
+    </style>
+
+    <!-- No background of the sheet's own: the survey page paints its theme's, clipped to the sheet's rounded top.
+         The bottom inset is the sheet fragment's: the page reaches under the navigation bar, and sits on the keyboard. -->
+    <style name="Voxtrics.BottomSheet" parent="Widget.Material3.BottomSheet.Modal">
+        <item name="backgroundTint">@android:color/transparent</item>
+        <item name="paddingBottomSystemWindowInsets">false</item>
+    </style>
+
+</resources>
