@@ -33,7 +33,7 @@ Voxtrics.showSurvey(
 - Call it on the main thread. One survey at a time.
 - The page loads out of sight; the sheet appears only when the survey is ready to answer. A survey that cannot be
   shown reports `onError` and shows nothing: `SURVEY_NOT_FOUND`, `NOT_IN_APP_SURVEY`, `ALREADY_SUBMITTED`, `OFFLINE`,
-  `TIMEOUT` (no answer in 10 s), `WEBVIEW_OUTDATED` (Android System WebView before Chrome 80), `UNKNOWN`.
+  `TIMEOUT` (no answer in 10 s), `WEBVIEW_OUTDATED` (Android System WebView before version 82), `UNKNOWN`.
 - The sheet takes the survey's height, up to 90% of the screen, and shrinks above the keyboard; the page scrolls past
   that. It is not draggable - Back, a tap outside and the survey's close control close it (`CloseReason.USER`, or
   `COMPLETED` after the thank-you screen).
@@ -70,6 +70,16 @@ The Android SDK path is in `local.properties` (`sdk.dir=…`), which is not comm
 
 ```bash
 ./gradlew :voxtrics:testDebugUnitTest :demo:assembleDebug
+```
+
+The instrumented tests (`voxtrics/src/androidTest`) run the SDK on a device or emulator the way an app uses it, and
+need no backend: the survey page is `FakeSurveyPage`, served from the test process, speaking the real page's bridge.
+They cover the sheet showing on ready, the score and the closes (the page's, Back, a tap outside, the screen going
+away), a rotation while open and while loading, a survey that cannot be shown, a page that fails or never gets ready
+(the 10 s timeout), links, a frame inside the page, and a second survey while one is open. With an emulator running:
+
+```bash
+./gradlew :voxtrics:connectedDebugAndroidTest
 ```
 
 ## Trying it against the local stack

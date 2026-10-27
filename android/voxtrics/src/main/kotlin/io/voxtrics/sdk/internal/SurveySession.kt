@@ -136,16 +136,12 @@ internal class SurveySession private constructor(
         webView.loadUrl(url)
     }
 
+    // Messages only from the survey's own origin, top frame - whatever else might ever load in the WebView. A WebView
+    // without WebMessageListener never gets here: start() refuses it, which lint does not follow across functions.
+    @SuppressLint("RequiresFeature")
     private fun installBridge() {
-        if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
-            // Messages only from the survey's own origin, top frame - whatever else might ever load in the WebView.
-            WebViewCompat.addWebMessageListener(webView, BRIDGE_NAME, setOf(origin)) { _, message, _, isMainFrame, _ ->
-                if (isMainFrame) message.data?.let(::onMessage)
-            }
-        } else {
-            @SuppressLint("JavascriptInterface")
-            val bridge = JavascriptBridge { json -> handler.post { onMessage(json) } }
-            webView.addJavascriptInterface(bridge, BRIDGE_NAME)
+        WebViewCompat.addWebMessageListener(webView, BRIDGE_NAME, setOf(origin)) { _, message, _, isMainFrame, _ ->
+            if (isMainFrame) message.data?.let(::onMessage)
         }
     }
 
@@ -340,9 +336,11 @@ internal class SurveySession private constructor(
     }
 
     private inner class Client : WebViewClient() {
-        // The survey's own page only: anything else the page might navigate to opens outside.
+        // The survey's own page only: anything else the page navigates to opens outside. A frame inside the page is
+        // left alone, as on iOS: WebView asks about a frame only for schemes other than http(s) - a mail or phone link
+        // - and those open an app outside only when the page itself asks (openUrl), never from a frame.
         override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
-            if (request.isForMainFrame && isOwnPage(request.url)) return false
+            if (!request.isForMainFrame || isOwnPage(request.url)) return false
             openExternally(request.url.toString())
             return true
         }
@@ -425,13 +423,13 @@ internal class SurveySession private constructor(
             options: SurveyOptions,
             listener: SurveyListener,
         ) {
-            val webViewMajor = WebViewVersion.major(activity)
             val error = when {
                 active != null -> SurveyError(SurveyErrorCode.UNKNOWN, "Another survey is already open")
                 !SurveyUrl.isValidSurveyId(surveyId) -> SurveyError(SurveyErrorCode.SURVEY_NOT_FOUND, "Not a survey id: $surveyId")
-                webViewMajor != null && webViewMajor < WebViewVersion.MIN_MAJOR -> SurveyError(
+                // The bridge needs it (WebView 82 and later); the page itself stops parsing below 80 anyway.
+                !WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER) -> SurveyError(
                     SurveyErrorCode.WEBVIEW_OUTDATED,
-                    "Android System WebView $webViewMajor is older than ${WebViewVersion.MIN_MAJOR}",
+                    "Android System WebView ${WebViewVersion.major(activity) ?: "(version unknown)"} has no WebMessageListener",
                 )
                 !Network.isOnline(activity) -> SurveyError(SurveyErrorCode.OFFLINE, "No connection")
                 activity.isFinishing || activity.isDestroyed -> SurveyError(SurveyErrorCode.UNKNOWN, "The screen is closing")

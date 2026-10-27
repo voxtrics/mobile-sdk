@@ -87,13 +87,14 @@ Run it from the repository's root. The demo: open `ios/Demo/VoxtricsDemo.xcodepr
 repository's root as a local package, and run the VoxtricsDemo scheme on a simulator. On a real device set a team in
 Signing & Capabilities first.
 
-The demo's UI tests (`ios/Demo/VoxtricsDemoUITests`) answer a survey and close it the three ways a person can, then
-have the app take the sheet down itself (the demo's `-takeDownAfterShown` launch argument), checking the events the
-app gets and that the next survey still opens. They need the local stack below and a published in-app survey whose first question is a 0-10 scale and
-second a text box; without its ID they skip.
+The demo's UI tests (`ios/Demo/VoxtricsDemoUITests`) drive the demo the way a person would and check the events the
+app gets: answer a survey and close it the three ways a person can, have the app take the sheet down itself (the
+demo's `-takeDownAfterShown` launch argument), a survey that cannot be shown, a page that fails or never gets ready
+(the 10 s timeout), a link, and a frame inside the page trying to talk for it. They need no backend: the survey page
+is `FakeSurveyPage`, served by the test runner on the loopback interface, speaking the real page's bridge.
 
 ```bash
-TEST_RUNNER_VOXTRICS_SURVEY_ID=<survey id> xcodebuild test -project ios/Demo/VoxtricsDemo.xcodeproj -scheme VoxtricsDemo -destination 'platform=iOS Simulator,name=iPhone 17'
+xcodebuild test -project ios/Demo/VoxtricsDemo.xcodeproj -scheme VoxtricsDemo -destination 'platform=iOS Simulator,name=iPhone 17'
 ```
 
 An older iOS: download its simulator runtime from developer.apple.com (More Downloads, "Simulator Runtime"), add it

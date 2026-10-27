@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- The fake survey page is served over plain HTTP from the test process itself (FakeSurveyPage). -->
+    <application android:usesCleartextTraffic="true">
+        <!-- AppCompat, not Material, as an app using the SDK may be: the sheet must bring its own theme. -->
+        <activity
+            android:name="io.voxtrics.sdk.TestHostActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AppCompat.DayNight.NoActionBar" />
+    </application>
+
+</manifest>

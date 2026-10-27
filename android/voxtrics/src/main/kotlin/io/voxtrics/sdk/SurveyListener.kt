@@ -67,7 +67,7 @@ public enum class SurveyErrorCode {
     TIMEOUT,
 
     /**
-     * The device's Android System WebView is too old to run the survey page (before Chrome 80, 2020). Nothing was
+     * The device's Android System WebView is too old to talk to the survey page (before version 82, 2020). Nothing was
      * loaded; updating "Android System WebView" from the Play Store fixes it.
      */
     WEBVIEW_OUTDATED,

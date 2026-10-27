@@ -10,7 +10,7 @@ import UIKit
 /// Every call is made on the main thread, and every event arrives on it.
 @MainActor
 public enum Voxtrics {
-    public static let sdkVersion = "0.1.0"
+    public static let sdkVersion = "0.1.1"
 
     static private(set) var config = VoxtricsConfig()
 
