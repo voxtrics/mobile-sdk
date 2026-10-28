@@ -6,3 +6,6 @@
 DerivedData/
 xcuserdata/
 *.xcuserstate
+
+# Result bundles of the CI's xcodebuild commands (.github/workflows/ci.yml) when run locally.
+/build/

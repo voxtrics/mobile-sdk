@@ -1,0 +1,106 @@
+# Both SDKs' tests on every push and pull request. None needs a Voxtrics backend: the device tests run against a fake
+# survey page the test itself serves (android/README.md, ios/README.md). The repository is public, so the job token
+# only reads, and every action is pinned to a commit rather than a tag that could be moved.
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['*']
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: Android - unit tests, lint, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: 17
+      # Also checks gradle-wrapper.jar against Gradle's published checksums before anything runs it.
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      - run: ./gradlew :voxtrics:testDebugUnitTest :voxtrics:lintRelease :demo:assembleDebug --console=plain
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: android-reports
+          path: android/*/build/reports/
+
+  android-device:
+    name: Android - instrumented tests on an emulator
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      # The emulator needs KVM, which GitHub's Linux runners have but do not open to the runner's user.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          working-directory: android
+          script: ./gradlew :voxtrics:connectedDebugAndroidTest --console=plain
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: android-device-reports
+          path: android/voxtrics/build/reports/androidTests/
+
+  ios:
+    name: iOS - unit and UI tests
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: xcodebuild -version
+      # The runner's Xcode names its simulators after its own iPhones: take the newest plain "iPhone N" on the newest iOS
+      # it has - not a Pro Max, an Air or a two-screen model the UI tests' gestures were not written for.
+      - name: Pick a simulator
+        id: simulator
+        run: |
+          udid=$(xcrun simctl list devices available --json | python3 -c '
+          import json, re, sys
+          devices = json.load(sys.stdin)["devices"]
+          runtimes = sorted((r for r in devices if ".iOS-" in r), key=lambda r: [int(p) for p in r.split(".iOS-")[1].split("-")])
+          for runtime in reversed(runtimes):
+              plain = [d for d in devices[runtime] if re.fullmatch(r"iPhone \d+", d["name"])]
+              if plain:
+                  print(max(plain, key=lambda d: int(d["name"].split()[1]))["udid"])
+                  sys.exit()
+          sys.exit("No plain iPhone simulator on this runner")
+          ')
+          echo "udid=$udid" >> "$GITHUB_OUTPUT"
+      - name: Package unit tests
+        run: xcodebuild test -scheme Voxtrics -destination "id=${{ steps.simulator.outputs.udid }}" -resultBundlePath build/unit.xcresult
+      - name: Demo UI tests
+        run: xcodebuild test -project ios/Demo/VoxtricsDemo.xcodeproj -scheme VoxtricsDemo -destination "id=${{ steps.simulator.outputs.udid }}" -resultBundlePath build/ui.xcresult
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ios-results
+          path: build/*.xcresult
