@@ -14,6 +14,8 @@ final class FakeSurveyPage {
         case notFound = "not-found"
         /// Never gets ready.
         case silent
+        /// Takes longer to arrive than the SDK gives a loaded page to get ready, then is ready at once.
+        case slow
         /// The page itself fails: HTTP 500.
         case serverError = "server-error"
         /// Ready, with a frame inside that then tries to close the survey and report a score - messages the bridge
@@ -25,6 +27,8 @@ final class FakeSurveyPage {
     private let queue = DispatchQueue(label: "io.voxtrics.demo.uitests.fake-survey-page")
 
     private var port: UInt16 = 0
+    /// How long `slow` takes to answer: past the SDK's readyTimeout (10 s), well within its pageLoadTimeout (20 s).
+    static let slowPageDelay: TimeInterval = 12
 
     /// The demo's base URL. The simulator shares the Mac's loopback, so the app reaches the runner's port.
     var baseURL: String { "http://127.0.0.1:\(port)" }
@@ -62,7 +66,10 @@ final class FakeSurveyPage {
             let (status, body) = self.respond(to: path)
             let head = "HTTP/1.1 \(status)\r\nContent-Type: text/html; charset=utf-8\r\n"
                 + "Content-Length: \(body.utf8.count)\r\nConnection: close\r\n\r\n"
-            connection.send(content: Data((head + body).utf8), completion: .contentProcessed { _ in connection.cancel() })
+            let delay = path == "/m/\(Survey.slow.rawValue)" ? Self.slowPageDelay : 0
+            self.queue.asyncAfter(deadline: .now() + delay) {
+                connection.send(content: Data((head + body).utf8), completion: .contentProcessed { _ in connection.cancel() })
+            }
         }
     }
 
@@ -74,6 +81,8 @@ final class FakeSurveyPage {
             return ("200 OK", page(onLoad: "fake.post('error', {code: 'SURVEY_NOT_FOUND', message: 'No such survey'});"))
         case "/m/\(Survey.silent.rawValue)":
             return ("200 OK", page(onLoad: ""))
+        case "/m/\(Survey.slow.rawValue)":
+            return ("200 OK", page(onLoad: "fake.ready();"))
         case "/m/\(Survey.serverError.rawValue)":
             return ("500 Internal Server Error", "Server error")
         case "/m/\(Survey.framed.rawValue)":

@@ -4,13 +4,18 @@ import WebKit
 
 /// One survey, from showSurvey to its end: the page loads in a WebView parked out of sight in the presenter's window,
 /// and only the page's `ready` - sent after its first `resize`, so the height is known - moves that WebView into the
-/// sheet. A survey that cannot be shown (missing, already answered, offline, no `ready` in 10 s) ends with `.error` and
-/// nothing on screen.
+/// sheet. A survey that cannot be shown (missing, already answered, offline, a page not loaded in 20 s or not `ready`
+/// 10 s after loading) ends with `.error` and nothing on screen.
 @MainActor
 final class SurveySession: NSObject {
     private enum State { case loading, shown, ended }
 
     static private(set) var active: SurveySession?
+    // Two budgets, so a slow network does not eat the page's own time: the page has pageLoadTimeout to load - its HTML,
+    // scripts and fonts, into a WebView that may have nothing cached, over a phone's network - and then readyTimeout to
+    // fetch its survey and report `ready`. One 10 s budget for both was mostly spent on the download on a first open
+    // (8 s seen against production).
+    static let pageLoadTimeout: TimeInterval = 20
     static let readyTimeout: TimeInterval = 10
     private static let bridgeName = "voxtrics"
     private static let maxHeightShare: CGFloat = 0.9
@@ -24,6 +29,7 @@ final class SurveySession: NSObject {
     private let log: Log
     private var state = State.loading
     private var timeout: DispatchWorkItem?
+    private var pageLoaded = false
     private var sheet: SurveySheetController?
     // A 1-point clipping box in the window: the WebView inside it is in the window, unhidden and full-sized - WebKit
     // renders and measures nothing for a hidden or zero-sized one - yet nothing of it shows or takes touches.
@@ -103,11 +109,7 @@ final class SurveySession: NSObject {
             return fail(.unknown, "The survey's address could not be built")
         }
         park(in: window)
-        let timeout = DispatchWorkItem { [weak self] in
-            self?.fail(.timeout, "The survey did not open within \(Int(Self.readyTimeout)) seconds")
-        }
-        self.timeout = timeout
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.readyTimeout, execute: timeout)
+        startTimeout(after: Self.pageLoadTimeout, "The survey page did not load within \(Int(Self.pageLoadTimeout)) seconds")
         log.debug("Opening \(url.absoluteString)")
         webView.load(URLRequest(url: url))
     }
@@ -170,6 +172,14 @@ final class SurveySession: NSObject {
         case .openURL(let url):
             openExternally(url)
         }
+    }
+
+    // One timer at a time: the page's load, then its getting ready.
+    private func startTimeout(after seconds: TimeInterval, _ message: String) {
+        timeout?.cancel()
+        let timeout = DispatchWorkItem { [weak self] in self?.fail(.timeout, message) }
+        self.timeout = timeout
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds, execute: timeout)
     }
 
     private func show() {
@@ -282,6 +292,14 @@ extension SurveySession: WKNavigationDelegate {
             return .cancel
         }
         return .allow
+    }
+
+    // The page is in, scripts included: from here it has its own time to get ready. A failed load does not get here as
+    // loading - didFail ended the survey first.
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        guard state == .loading, !pageLoaded, isOwnPage(webView.url) else { return }
+        pageLoaded = true
+        startTimeout(after: Self.readyTimeout, "The survey did not open within \(Int(Self.readyTimeout)) seconds of its page loading")
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {

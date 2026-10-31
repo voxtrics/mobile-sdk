@@ -86,11 +86,21 @@ final class SurveyFlowUITests: XCTestCase {
         expectEvent(startingWith: "error UNKNOWN")
     }
 
+    // The page's download has a budget of its own: a page that is slow to arrive still opens, however long a loaded page
+    // is given to get ready. With one 10 s budget for both, this one timed out.
+    func testASlowPageStillOpens() {
+        launch(.slow)
+        app.buttons["Show survey"].tap()
+
+        expectEvent(startingWith: "shown", timeout: FakeSurveyPage.slowPageDelay + 10)
+        XCTAssertFalse(event(startingWith: "error").exists)
+    }
+
     func testAPageThatNeverGetsReadyTimesOut() {
         launch(.silent)
         app.buttons["Show survey"].tap()
 
-        // The SDK gives a page 10 s to be ready.
+        // The SDK gives a loaded page 10 s to be ready (this one loads at once).
         XCTAssertFalse(event(startingWith: "error").waitForExistence(timeout: 8))
         expectEvent(startingWith: "error TIMEOUT", timeout: 5)
         XCTAssertFalse(survey.exists)

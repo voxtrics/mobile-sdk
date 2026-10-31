@@ -11,7 +11,7 @@ plugins {
 }
 
 // Reported to the backend with every response (appContext.sdkVersion) and readable as Voxtrics.SDK_VERSION.
-val sdkVersion = "0.1.1"
+val sdkVersion = "0.1.2"
 
 android {
     namespace = "io.voxtrics.sdk"

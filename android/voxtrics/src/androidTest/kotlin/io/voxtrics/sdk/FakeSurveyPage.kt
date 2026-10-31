@@ -1,9 +1,11 @@
 package io.voxtrics.sdk
 
+import io.voxtrics.sdk.internal.SurveySession
 import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
+import java.util.concurrent.TimeUnit
 
 /**
  * A stand-in for the survey page the SDK opens (`{baseUrl}/m/{surveyId}`), served from the test process, so the SDK is
@@ -30,6 +32,7 @@ internal class FakeSurveyPage : AutoCloseable {
         "/m/$READY_ON_CUE" -> page(onLoad = "")
         "/m/$NOT_FOUND" -> page(onLoad = "fake.post('error', {code: 'SURVEY_NOT_FOUND', message: 'No such survey'});")
         "/m/$SILENT" -> page(onLoad = "")
+        "/m/$SLOW" -> page(onLoad = "fake.ready();").setBodyDelay(SLOW_PAGE_DELAY_MS, TimeUnit.MILLISECONDS)
         "/m/$SERVER_ERROR" -> MockResponse().setResponseCode(500).setBody("Server error")
         // The survey page itself says nothing; a frame inside it, from its own origin, tries to talk for it.
         "/m/$FRAMED" -> page(onLoad = "", top = """<iframe src="/talking-frame" style="width:100%;height:120px;border:0"></iframe>""")
@@ -82,6 +85,10 @@ internal class FakeSurveyPage : AutoCloseable {
 
         /** Never gets ready. */
         const val SILENT = "silent"
+
+        /** Takes longer to arrive than the SDK gives a loaded page to get ready, then is ready at once. */
+        const val SLOW = "slow"
+        const val SLOW_PAGE_DELAY_MS = SurveySession.READY_TIMEOUT_MS + 2_000
 
         /** The page itself fails: HTTP 500. */
         const val SERVER_ERROR = "server-error"

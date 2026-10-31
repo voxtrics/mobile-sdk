@@ -103,6 +103,16 @@ class SurveySheetTest {
         listener.expect("error UNKNOWN")
     }
 
+    // The page's download has a budget of its own: a page that is slow to arrive still opens, however long a loaded
+    // page is given to get ready. With one 10 s budget for both, this one timed out.
+    @Test
+    fun aSlowPageStillOpens() {
+        show(FakeSurveyPage.SLOW)
+
+        listener.expect("shown", timeoutMs = FakeSurveyPage.SLOW_PAGE_DELAY_MS + 5_000)
+        waitFor { sheetIsShowing() }
+    }
+
     @Test
     fun aPageThatNeverGetsReadyTimesOut() {
         show(FakeSurveyPage.SILENT)

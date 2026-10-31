@@ -46,7 +46,8 @@ import kotlin.math.roundToInt
 /**
  * One survey, from showSurvey to its end: the page loads in a WebView parked out of sight over the activity, and only
  * the page's `ready` - sent after its first `resize`, so the height is known - moves that WebView into the sheet. A
- * survey that cannot be shown (missing, already answered, offline, no `ready` in 10 s) ends with onError and nothing
+ * survey that cannot be shown (missing, already answered, offline, a page not loaded in 20 s or not `ready` 10 s after
+ * loading) ends with onError and nothing
  * on screen. A configuration change (a rotation, dark mode, a new window size) replaces the activity, and the survey
  * moves over to the new one. Every message and callback is on the main thread.
  */
@@ -108,7 +109,17 @@ internal class SurveySession private constructor(
         webChromeClient = ChromeClient()
     }
 
-    private val timeout = Runnable { fail(SurveyErrorCode.TIMEOUT, "The survey did not open within ${READY_TIMEOUT_MS / 1000} seconds") }
+    // Two budgets, so a slow network does not eat the page's own time: the page has PAGE_LOAD_TIMEOUT_MS to load - its
+    // HTML, scripts and fonts, into a WebView that may have nothing cached, over a phone's network - and then
+    // READY_TIMEOUT_MS to fetch its survey and report `ready`. One 10 s budget for both was mostly spent on the download
+    // on a first open (8 s seen against production).
+    private var pageLoaded = false
+    private val pageLoadTimeout = Runnable {
+        fail(SurveyErrorCode.TIMEOUT, "The survey page did not load within ${PAGE_LOAD_TIMEOUT_MS / 1000} seconds")
+    }
+    private val readyTimeout = Runnable {
+        fail(SurveyErrorCode.TIMEOUT, "The survey did not open within ${READY_TIMEOUT_MS / 1000} seconds of its page loading")
+    }
 
     // The activity going away ends the survey - unless a configuration change is replacing it: then the survey waits
     // for the new one.
@@ -130,7 +141,7 @@ internal class SurveySession private constructor(
         installBridge()
         activity.lifecycle.addObserver(lifecycleObserver)
         park()
-        handler.postDelayed(timeout, READY_TIMEOUT_MS)
+        handler.postDelayed(pageLoadTimeout, PAGE_LOAD_TIMEOUT_MS)
         val url = pageUrl(options)
         log.debug("Opening $url")
         webView.loadUrl(url)
@@ -213,8 +224,13 @@ internal class SurveySession private constructor(
 
     fun sheetHeight(): Int = min(contentHeight, maxHeight)
 
+    private fun stopTimeouts() {
+        handler.removeCallbacks(pageLoadTimeout)
+        handler.removeCallbacks(readyTimeout)
+    }
+
     private fun show() {
-        handler.removeCallbacks(timeout)
+        stopTimeouts()
         val fragments = activity.supportFragmentManager
         if (activity.isFinishing || activity.isDestroyed || fragments.isStateSaved) {
             fail(SurveyErrorCode.UNKNOWN, "The screen the survey was opened from is not showing")
@@ -307,7 +323,7 @@ internal class SurveySession private constructor(
     }
 
     private fun release() {
-        handler.removeCallbacks(timeout)
+        stopTimeouts()
         stopAwaitingReplacement()
         activity.lifecycle.removeObserver(lifecycleObserver)
         if (active === this) active = null
@@ -347,6 +363,15 @@ internal class SurveySession private constructor(
 
         override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
             log.debug("Loading $url")
+        }
+
+        // The page is in, scripts included: from here it has its own time to get ready. A failed load does not get here
+        // as LOADING - onReceivedError ended the survey first.
+        override fun onPageFinished(view: WebView, url: String) {
+            if (state != State.LOADING || pageLoaded || !isOwnPage(Uri.parse(url))) return
+            pageLoaded = true
+            handler.removeCallbacks(pageLoadTimeout)
+            handler.postDelayed(readyTimeout, READY_TIMEOUT_MS)
         }
 
         override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
@@ -400,6 +425,7 @@ internal class SurveySession private constructor(
     }
 
     companion object {
+        const val PAGE_LOAD_TIMEOUT_MS = 20_000L
         const val READY_TIMEOUT_MS = 10_000L
         private const val REPLACEMENT_TIMEOUT_MS = 5_000L
         private const val SHEET_EXIT_MS = 400L
