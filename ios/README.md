@@ -55,7 +55,8 @@ Button("Feedback") { showSurvey = true }
 - Call it on the main thread; every event arrives on it. One survey at a time.
 - The page loads out of sight; the sheet appears only when the survey is ready to answer. A survey that cannot be
   shown reports `.error` and shows nothing: `surveyNotFound`, `notInAppSurvey`, `alreadySubmitted`, `offline`,
-  `timeout` (no answer in 10 s), `unknown`. The raw values are the codes both SDKs share (`SURVEY_NOT_FOUND`, …).
+  `timeout` (the page didn't load in 20 s, or the survey didn't open 10 s after it did), `unknown`. The raw values are
+  the codes both SDKs share (`SURVEY_NOT_FOUND`, …).
 - The sheet takes the survey's height, up to 90% of the screen; the page scrolls past that. A swipe down from the
   page's top, a tap outside and the survey's close control close it (`.user`, or `.completed` after the thank-you
   screen). From iOS 26 the sheet floats a little in from the screen's edges, the system's own style; on iPad too it
@@ -89,9 +90,10 @@ Signing & Capabilities first.
 
 The demo's UI tests (`ios/Demo/VoxtricsDemoUITests`) drive the demo the way a person would and check the events the
 app gets: answer a survey and close it the three ways a person can, have the app take the sheet down itself (the
-demo's `-takeDownAfterShown` launch argument), a survey that cannot be shown, a page that fails or never gets ready
-(the 10 s timeout), a link, and a frame inside the page trying to talk for it. They need no backend: the survey page
-is `FakeSurveyPage`, served by the test runner on the loopback interface, speaking the real page's bridge.
+demo's `-takeDownAfterShown` launch argument), a survey that cannot be shown, a page that fails, never gets ready (the
+timeout) or loads slowly and still opens, a link, and a frame inside the page trying to talk for it. They need no
+backend: the survey page is `FakeSurveyPage`, served by the test runner on the loopback interface, speaking the real
+page's bridge.
 
 ```bash
 xcodebuild test -project ios/Demo/VoxtricsDemo.xcodeproj -scheme VoxtricsDemo -destination 'platform=iOS Simulator,name=iPhone 17'
@@ -104,11 +106,11 @@ with `xcrun simctl runtime add <dmg>`, create a device on it and pass that devic
 
 The demo opens the survey page on `http://localhost:3000` by default - the admin's dev server, whose widget calls the
 backend on `http://localhost:4000`. The simulator shares the Mac's `localhost`, so nothing needs forwarding. Enter the
-ID of a published in-app survey (on an app domain in the admin) and press Show survey. Every event is logged on the
-screen, the bridge's traffic goes to the Xcode console (debug level, subsystem `io.voxtrics.sdk`), and the page can
-be inspected from Safari's Develop menu (logging makes the WebView inspectable). A simulator that has just booted can
-take longer than the 10 s timeout to start WebKit and load the dev server's page the first time; the next try opens
-in about a second. The demo's Info.plist allows plain HTTP to local addresses only
+ID of a published in-app survey (its app added in the admin's Settings, Apps) and press Show survey. Every event is
+logged on the screen, the bridge's traffic goes to the Xcode console (debug level, subsystem `io.voxtrics.sdk`), and the
+page can be inspected from Safari's Develop menu (logging makes the WebView inspectable). A simulator that has just
+booted can be slow enough starting WebKit and loading the dev server's page the first time to run into the timeouts; the
+next try opens in about a second. The demo's Info.plist allows plain HTTP to local addresses only
 (`NSAllowsLocalNetworking`); the library itself asks for no exception.
 
 On a real iPhone `localhost` is the phone itself, so the demo reaches the Mac by its network address instead. Put the

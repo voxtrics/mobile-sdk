@@ -63,7 +63,7 @@ public enum class SurveyErrorCode {
     /** No connection. Nothing was shown. */
     OFFLINE,
 
-    /** The survey did not open within 10 seconds. */
+    /** The survey's page did not load within 20 seconds, or the survey did not open within 10 seconds after it did. */
     TIMEOUT,
 
     /**

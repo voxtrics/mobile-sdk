@@ -56,7 +56,7 @@ public enum SurveyErrorCode: String, Sendable {
     case alreadySubmitted = "ALREADY_SUBMITTED"
     /// No connection. Nothing was shown.
     case offline = "OFFLINE"
-    /// The survey did not open within 10 seconds.
+    /// The survey's page did not load within 20 seconds, or the survey did not open within 10 seconds after it did.
     case timeout = "TIMEOUT"
     case unknown = "UNKNOWN"
 }
