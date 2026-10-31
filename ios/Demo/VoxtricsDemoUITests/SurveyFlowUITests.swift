@@ -61,7 +61,10 @@ final class SurveyFlowUITests: XCTestCase {
 
     func testTheAppTakingTheSheetDownReportsClosedByUserAndTheNextSurveyOpens() {
         launch(.ready, adding: ["-takeDownAfterShown", "2"])
-        openSurvey()
+        // Not openSurvey(): its wait for the sheet to settle can outlast the 2 s, and the sheet is gone under it -
+        // which a CI runner is slow enough for. Nothing here drags the sheet.
+        app.buttons["Show survey"].tap()
+        expectEvent("shown")
 
         expectEvent("app took its screens down")
         expectEvent("closed user")
@@ -100,9 +103,10 @@ final class SurveyFlowUITests: XCTestCase {
         launch(.silent)
         app.buttons["Show survey"].tap()
 
-        // The SDK gives a loaded page 10 s to be ready (this one loads at once).
+        // The SDK gives a loaded page 10 s to be ready, so nothing comes before that. How long after it depends on how
+        // fast the page loads: a cold simulator takes seconds to start WebKit, and the page itself has 20 s.
         XCTAssertFalse(event(startingWith: "error").waitForExistence(timeout: 8))
-        expectEvent(startingWith: "error TIMEOUT", timeout: 5)
+        expectEvent(startingWith: "error TIMEOUT", timeout: 20)
         XCTAssertFalse(survey.exists)
     }
 

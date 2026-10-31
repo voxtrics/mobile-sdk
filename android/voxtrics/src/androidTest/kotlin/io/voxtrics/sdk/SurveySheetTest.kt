@@ -109,7 +109,8 @@ class SurveySheetTest {
     fun aSlowPageStillOpens() {
         show(FakeSurveyPage.SLOW)
 
-        listener.expect("shown", timeoutMs = FakeSurveyPage.SLOW_PAGE_DELAY_MS + 5_000)
+        // Counted from show(), so it also covers the WebView starting up, which takes seconds on a cold device.
+        listener.expect("shown", timeoutMs = FakeSurveyPage.SLOW_PAGE_DELAY_MS + 10_000)
         waitFor { sheetIsShowing() }
     }
 
@@ -117,8 +118,10 @@ class SurveySheetTest {
     fun aPageThatNeverGetsReadyTimesOut() {
         show(FakeSurveyPage.SILENT)
 
+        // The ready budget starts when the page has loaded, so nothing comes before show() + READY_TIMEOUT_MS. How long
+        // after that depends on the device: a cold one takes seconds to start the WebView and load the page.
         listener.expectNothing(SurveySession.READY_TIMEOUT_MS - 1_000)
-        listener.expect("error TIMEOUT", timeoutMs = 3_000)
+        listener.expect("error TIMEOUT", timeoutMs = SurveySession.PAGE_LOAD_TIMEOUT_MS)
     }
 
     @Test
