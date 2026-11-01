@@ -68,10 +68,11 @@ final class SurveyFlowUITests: XCTestCase {
 
         expectEvent("app took its screens down")
         expectEvent("closed user")
-        // The survey let go: another one opens.
+        // The survey let go: another one opens - and stays, the demo takes its screens down once. Seen on screen, not
+        // counted in the event log: the log is a lazy list, newest first, and the first "shown" scrolls out of it.
+        XCTAssertTrue(survey.waitForNonExistence(timeout: 5), "The first survey stayed on screen")
         app.buttons["Show survey"].tap()
-        let shown = app.staticTexts.matching(NSPredicate(format: "label ENDSWITH %@", "  shown"))
-        wait(for: [expectation(for: NSPredicate(format: "count == 2"), evaluatedWith: shown)], timeout: 15)
+        XCTAssertTrue(survey.buttons["9"].waitForExistence(timeout: 15), "The next survey never appeared")
     }
 
     func testASurveyThePageCannotShowReportsWhyAndShowsNothing() {

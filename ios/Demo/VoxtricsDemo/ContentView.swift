@@ -11,6 +11,7 @@ struct ContentView: View {
     @State private var theme = DemoTheme.system
     @State private var showingSurvey = false
     @State private var log: [String] = []
+    @State private var tookScreensDown = false
 
     var body: some View {
         NavigationStack {
@@ -67,10 +68,11 @@ struct ContentView: View {
     }
 
     // For the UI tests (-takeDownAfterShown <seconds>): the app dismissing what is presented over it, as a deep link
-    // or a logout would - which takes the survey's sheet down with it.
+    // or a logout would - which takes the survey's sheet down with it. Once, so the next survey stays to be seen.
     private func takeDownScreensLater() {
         let delay = UserDefaults.standard.double(forKey: "takeDownAfterShown")
-        guard delay > 0 else { return }
+        guard delay > 0, !tookScreensDown else { return }
+        tookScreensDown = true
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
             let window = UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.keyWindow }.first
             append("app took its screens down")
